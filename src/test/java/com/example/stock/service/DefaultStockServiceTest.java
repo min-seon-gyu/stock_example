@@ -9,17 +9,16 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @SpringBootTest
-class StockServiceTest {
+class DefaultStockServiceTest {
 
     @Autowired
-    private StockService stockService;
+    private SynchronizedStockService stockService;
 
     @Autowired
     private StockRepository stockRepository;
@@ -44,17 +43,19 @@ class StockServiceTest {
     }
 
     @Test
-    public void 동시에_100개의_요청() throws InterruptedException {
+    public void Synchronized_동시에_100개의_요청() throws InterruptedException {
         int threadCount = 100;
         ExecutorService executorService = Executors.newFixedThreadPool(32);
         CountDownLatch latch = new CountDownLatch(threadCount);
 
         for (int i = 0; i < threadCount; i++) {
-            try {
-                executorService.submit(() -> stockService.decrease(1L, 1L));
-            } finally {
-                latch.countDown();
-            }
+            executorService.submit(() -> {
+                try {
+                    stockService.decrease(1L, 1L);
+                } finally {
+                    latch.countDown();
+                }
+            });
         }
 
         latch.await();
@@ -62,6 +63,5 @@ class StockServiceTest {
         Stock stock = stockRepository.findById(1L).orElseThrow();
 
         assertEquals(0L, stock.getQuantity());
-
     }
 }
