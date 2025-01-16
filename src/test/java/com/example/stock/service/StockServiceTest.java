@@ -15,10 +15,13 @@ import java.util.concurrent.Executors;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @SpringBootTest
-class DefaultStockServiceTest {
+class StockServiceTest {
 
     @Autowired
     private SynchronizedStockService stockService;
+
+    @Autowired
+    private PessimisticLockStockService pessimisticLockStockService;
 
     @Autowired
     private StockRepository stockRepository;
@@ -52,6 +55,29 @@ class DefaultStockServiceTest {
             executorService.submit(() -> {
                 try {
                     stockService.decrease(1L, 1L);
+                } finally {
+                    latch.countDown();
+                }
+            });
+        }
+
+        latch.await();
+
+        Stock stock = stockRepository.findById(1L).orElseThrow();
+
+        assertEquals(0L, stock.getQuantity());
+    }
+
+    @Test
+    public void PessimisticLock_동시에_100개의_요청() throws InterruptedException {
+        int threadCount = 100;
+        ExecutorService executorService = Executors.newFixedThreadPool(32);
+        CountDownLatch latch = new CountDownLatch(threadCount);
+
+        for (int i = 0; i < threadCount; i++) {
+            executorService.submit(() -> {
+                try {
+                    pessimisticLockStockService.decrease(1L, 1L);
                 } finally {
                     latch.countDown();
                 }
